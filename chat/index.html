@@ -7,14 +7,18 @@
 </head>
 <body>
     <ul id="messages"></ul>
+    
     <form id="message_form" action="#">
+      <p>username:</p>
+      <p><input id="input_username" autocomplete="off" /></p>
+      <p>massage:</p>
       <input id="input_msg" autocomplete="off" /><button>Send</button>
     </form>
   <script>
       var socketio = io();
       $(function(){
           $('#message_form').submit(function(){
-            socketio.emit('message', $('#input_msg').val());
+            socketio.emit('message', $('#input_username').val()+':'+$('#input_msg').val());
             $('#input_msg').val('');
             return false;
           });
