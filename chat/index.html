@@ -18,7 +18,7 @@
       var socketio = io();
       $(function(){
           $('#message_form').submit(function(){
-            socketio.emit('message', $('#input_username').val()+':'+$('#input_msg').val());
+            socketio.emit('message', $('#input_username').val()+':　'+$('#input_msg').val());
             $('#input_msg').val('');
             return false;
           });
