@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ja">
+    <head>
+        <meta charset="utf-8" />
+        <title>videochat</title>
+        <script src="/socket.io/socket.io.js"></script>
+    </head>
+    <body>
+        <button type="button" id="start">start</button>
+        <button type="button" id="stop" style="display: none;" disabled>stop</button>
+
+    </body>
+    <main>
+        <video id="local"  autoplay muted playsinline></video>
+        <video id="remote"  autoplay muted playsinline></video>
+    </main>
+    <script>
+        socket=io();
+        var receivedsp;
+        var remotevideoflag=false;
+        var peer;
+        var iceq=[];
+        socket.on('connect',() =>{
+            console.log('connection');
+        });
+        socket.on('message',async(event) =>{
+            let message=JSON.parse(event);
+            if(!peer){
+                    return console.log('peer is not exist',message);
+            }
+            if(message.sdp){
+                switch(message.sdp.type){
+                    case 'offer': {
+                        console.log('sdp offer', message);
+                        await peer.setRemoteDescription(new RTCSessionDescription(message.sdp));
+                        receivedsp=message.sdp;
+                        const answer=await peer.createAnswer();
+                        await peer.setLocalDescription(answer);
+                        socket.emit('message', JSON.stringify({ sdp: peer.setLocalDescription }));
+                    }
+                    case 'answer': {
+                        console.log('answer',message);
+                        receivedsp=message.sdp;
+                        await peer.setRemoteDescription(new RTCSessionDescription(message.sdp));
+                    }
+                }
+            }
+            else if (message.candidate){
+                console.log('candidate',message);
+                const candidate = new RTCIceCandidate(message.candidate);
+                peer.addIceCandidate(candidate);
+            }
+        });
+        
+        function peerconnection(stream){
+            if(peer){
+                return;
+            }
+            const config={iceServers:[ {urls:'stun:stun.l.google.com:19302'}]};
+            peer=new RTCPeerConnection(config);
+            peer.onicecandidate= event => {
+                if (event.candidate) {
+                    console.log('onicecandidate',event);
+                    socket.emit('message', JSON.stringify({ candidate: event.candidate}));
+                }else{
+                    console.log('ice finished');
+                    
+                }
+            }
+            stream.getTracks().forEach(track => peer.addTrack(track, stream));
+            
+            peer.ontrack= event => {
+                console.log('ontrack',event);
+                remotevideoflag=true;
+                var remotevideo=document.getElementById('remote');
+                //console.log('waiting play remote video',event);
+                playvideo(remotevideo,event.streams[0]);
+
+            }
+            
+        }
+        async function playvideo(video,stream) {
+            video.srcObject=stream;
+            await video.play();
+            //console.log('started remote video');
+        }
+        async function startvideo() {
+            const myvideostream=await navigator.mediaDevices.getUserMedia({
+                video: true,
+                audio: false
+            });
+            const myvideo=document.getElementById('local');
+            try {
+                myvideo.srcObject=myvideostream;
+            } catch (error) {
+                myvideo.src=URL.createObjectURL(myvideostream);
+            }
+            await myvideo.play();
+            console.log('started local video');
+            return myvideostream;
+        }
+        document.getElementById('start').addEventListener('click',async ()=>{
+            const myvideostream= await startvideo();
+            peerconnection(myvideostream);
+            const session=await peer.createOffer();
+            await peer.setLocalDescription(session);
+            socket.emit('message', JSON.stringify({sdp: peer.localDescription}));
+            document.getElementById('start').disabled=true;
+            document.getElementById('stop').disabled=false;
+            document.getElementById('start').style.display='none';
+            document.getElementById('stop').style.display='inline';
+        });
+        document.getElementById('stop').addEventListener('click',() =>{
+            peer.close();
+            peer=null;
+            document.getElementById('remote').pause();
+            document.getElementById('remote').srcObject=null;
+            remotevideoflag=false;
+            document.getElementById('start').disabled=false;
+            document.getElementById('stop').disabled=true;
+            document.getElementById('start').style.display='inline';
+            document.getElementById('stop').style.display='none';
+        });
+    </script>
+</html>
