@@ -16,10 +16,13 @@
     </main>
     <script>
         socket=io();
-        var receivedsp;
         var remotevideoflag=false;
         var peer;
-        var iceq=[];
+        const localvideo=document.getElementById('local');
+        const remotevideo=document.getElementById('remote');
+        const startbutton=document.getElementById('start');
+        const stopbutton=document.getElementById('stop');
+        //var iceq=[];
         socket.on('connect',() =>{
             console.log('connection');
         });
@@ -29,24 +32,19 @@
                     return console.log('peer is not exist',message);
             }
             if(message.sdp){
+                await peer.setRemoteDescription(new RTCSessionDescription(message.sdp));
                 switch(message.sdp.type){
                     case 'offer': {
-                        console.log('sdp offer', message);
-                        await peer.setRemoteDescription(new RTCSessionDescription(message.sdp));
-                        receivedsp=message.sdp;
-                        const answer=await peer.createAnswer();
+                        const answer = await peer.createAnswer();
                         await peer.setLocalDescription(answer);
-                        socket.emit('message', JSON.stringify({ sdp: peer.setLocalDescription }));
+                        socket.emit('message', JSON.stringify({ sdp: peer.localDescription }));
                     }
                     case 'answer': {
-                        console.log('answer',message);
-                        receivedsp=message.sdp;
-                        await peer.setRemoteDescription(new RTCSessionDescription(message.sdp));
+                        console.log('message: answer');
                     }
                 }
             }
             else if (message.candidate){
-                console.log('candidate',message);
                 const candidate = new RTCIceCandidate(message.candidate);
                 peer.addIceCandidate(candidate);
             }
@@ -60,20 +58,13 @@
             peer=new RTCPeerConnection(config);
             peer.onicecandidate= event => {
                 if (event.candidate) {
-                    console.log('onicecandidate',event);
                     socket.emit('message', JSON.stringify({ candidate: event.candidate}));
-                }else{
-                    console.log('ice finished');
-                    
                 }
             }
             stream.getTracks().forEach(track => peer.addTrack(track, stream));
             
             peer.ontrack= event => {
-                console.log('ontrack',event);
                 remotevideoflag=true;
-                var remotevideo=document.getElementById('remote');
-                //console.log('waiting play remote video',event);
                 playvideo(remotevideo,event.streams[0]);
 
             }
@@ -82,21 +73,18 @@
         async function playvideo(video,stream) {
             video.srcObject=stream;
             await video.play();
-            //console.log('started remote video');
         }
         async function startvideo() {
             const myvideostream=await navigator.mediaDevices.getUserMedia({
                 video: true,
                 audio: false
             });
-            const myvideo=document.getElementById('local');
             try {
-                myvideo.srcObject=myvideostream;
+                localvideo.srcObject=myvideostream;
             } catch (error) {
-                myvideo.src=URL.createObjectURL(myvideostream);
+                localvideo.src=URL.createObjectURL(myvideostream);
             }
-            await myvideo.play();
-            console.log('started local video');
+            await localvideo.play();
             return myvideostream;
         }
         document.getElementById('start').addEventListener('click',async ()=>{
@@ -105,21 +93,22 @@
             const session=await peer.createOffer();
             await peer.setLocalDescription(session);
             socket.emit('message', JSON.stringify({sdp: peer.localDescription}));
-            document.getElementById('start').disabled=true;
-            document.getElementById('stop').disabled=false;
-            document.getElementById('start').style.display='none';
-            document.getElementById('stop').style.display='inline';
+            startbutton.disabled=true;
+            stopbutton.disabled=false;
+            startbutton.style.display='none';
+            stopbutton.style.display='inline';
         });
         document.getElementById('stop').addEventListener('click',() =>{
             peer.close();
             peer=null;
-            document.getElementById('remote').pause();
-            document.getElementById('remote').srcObject=null;
+            remotevideo.pause();
+            remotevideo.srcObject=null;
             remotevideoflag=false;
-            document.getElementById('start').disabled=false;
-            document.getElementById('stop').disabled=true;
-            document.getElementById('start').style.display='inline';
-            document.getElementById('stop').style.display='none';
+            localvideo.pause();
+            startbutton.disabled=false;
+            stopbutton.disabled=true;
+            startbutton.style.display='inline';
+            stopbutton.style.display='none';
         });
     </script>
 </html>
