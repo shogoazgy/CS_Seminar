@@ -87,7 +87,7 @@
             await localvideo.play();
             return myvideostream;
         }
-        document.getElementById('start').addEventListener('click',async ()=>{
+        startbutton.addEventListener('click',async ()=>{
             const myvideostream= await startvideo();
             peerconnection(myvideostream);
             const session=await peer.createOffer();
@@ -98,7 +98,7 @@
             startbutton.style.display='none';
             stopbutton.style.display='inline';
         });
-        document.getElementById('stop').addEventListener('click',() =>{
+        stopbutton.addEventListener('click',() =>{
             peer.close();
             peer=null;
             remotevideo.pause();
